@@ -66,6 +66,63 @@ class FMLite:
         ]).sum()
         return self.b + np.dot(self.w, x.T) + interaction_sum
 
+    def _partial_normal_V(self, x):
+        """Vの(i, f)成分でy_predを偏微分した値を返すメソッド
+        """
+        n_features = x.shape[0]
+        _V = np.empty((n_features, self.k))
+        for i in range(n_features):
+            for f in range(self.k):
+                s = 0.0
+                for j in range(n_features):
+                    s += self.V[j, f] * x[j]
+                _V[i, f] = x[i] * s - self.V[i, f] * x[i] ** 2
+        return np.asmatrix(_V)
+
+    def _partial_cb_V(self, x):
+        """Vの(i, f)成分でy_predを偏微分した値を返すメソッド
+
+        0 <= i < n_entities && n_entities <= j < 2 * n_entities
+        を満たす idx, jdx の組合せのみについてVの勾配を計算する.
+        """
+        M = self.n_entities
+        n = self.n_features
+        _V = np.empty((2 * M + n, self.k))
+        for i in range(2 * M + n):
+            for f in range(self.k):
+                s = 0.0
+                for j in range(2 * M + n):
+                    if 0 <= i < M and 0 <= j < M:
+                        continue
+                    elif M <= i < 2 * M and M <= j < 2 * M:
+                        continue
+                    else:
+                        s += self.V[j, f] * x[j]
+                _V[i, f] = x[i] * s - self.V[i, f] * x[i] ** 2
+        return np.asmatrix(_V)
+
+    def _make_evaluate_grad_func(self):
+        """LMSに対する偏微分の値を計算する「関数」を返すメソッド
+        """
+        if self.mode == 'normal':
+            # [START normal version]
+            def _calc_normal(x_i, diff):
+                b_grad = 2 * diff
+                w_grad = 2 * diff * x_i
+                V_grad = 2 * diff * self._partial_normal_V(x_i)
+                return (b_grad, w_grad, V_grad)
+            return _calc_normal
+            # [END normal version]
+        elif self.mode == 'combination-dependent':
+            # [START combination-dependent version]
+            def _calc_cb(x_i, diff):
+                b_grad = 2 * diff
+                w_grad = 2 * diff * x_i
+                V_grad = 2 * diff * self._partial_cb_V(x_i)
+                return (b_grad, w_grad, V_grad)
+            return _calc_cb
+            # [END combination-dependent version]
+
     def _gradient_descent(self, X_train, y_train, type='stochastic'):
         """Optimization using Gradient Descent method.
 
@@ -80,37 +137,15 @@ class FMLite:
         ------
         errors : np.array, shape = (n_samples * n_epochs, )
         """
-        # [START Vの(i, f)成分でy_predを偏微分した値を返す関数の定義]
-        # TODO リファクタリング
-        def _partial_V(x):
-            """i番目の事例について
-            """
-            n_features = x.shape[0]
-            _V = np.empty((n_features, self.k))
-            for i in range(n_features):
-                for f in range(self.k):
-                    s = 0.0
-                    for j in range(n_features):
-                        s += self.V[j, f] * x[j]
-                    _V[i, f] = x[i] * s - self.V[i, f] * x[i] ** 2
-            return np.asmatrix(_V)
-
-        # [END Vの(i, f)成分でy_predを偏微分した値を返す関数の定義]
-
-        # [START MLSに対する偏微分の値を返す関数の定義]
-        def _evaluate_grad(x_i, diff):
-            b_grad = 2 * diff
-            w_grad = 2 * diff * x_i  # using bloadcasting
-            V_grad = 2 * diff * _partial_V(x_i)  # using bloadcasting
-            return (b_grad, w_grad, V_grad)
-        # [END MLSに対する偏微分の値を返す関数の定義]
-
         errors = []
         n_samples, n_features = X_train.shape
         normal_params = {'scale': 0.01, 'size': (n_features, self.k)}
         self.b = 0.0
         self.w = np.zeros(n_features)
         self.V = np.asmatrix(np.random.normal(**normal_params))
+        # [START 関数の固定化による高速化]
+        _evaluate_grad = self._make_evaluate_grad_func()
+        # [END 関数の固定化による高速化]
         # [START parameter estimation]
         for _ in tqdm(range(self.n_epochs)):
             for ind in np.random.permutation(n_samples):
