@@ -10,6 +10,6 @@ setup(
     author_email='moriaki3193@gmail.com',
     url='https://github.com/moriaki3193/FMLite',
     license=license,
-    packages=find_packages(exclude=('tests', 'docs')),
+    packages=find_packages(exclude=('tests', 'docs', 'notebooks')),
     test_suite='tests'
 )
