@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from itertools import combinations
 from prettytable import PrettyTable
+from .constants import VALIDATION_ERR_MSG
 
 
 class FMLite:
@@ -15,6 +16,8 @@ class FMLite:
             n_epochs=1000,
             task='regression',
             mode='normal',
+            n_entities=None,
+            n_features=None,
             biased=True,
             verbose=True):
         """Setting hyper-params & semantics, etc...
@@ -31,6 +34,15 @@ class FMLite:
         verbose : bool, indicates if a log is verbose.
             Default to True.
         """
+        if mode not in ['normal', 'combination-dependent']:
+            raise ValueError(VALIDATION_ERR_MSG['mode'])
+        # [START combination-dependent param validation]
+        if mode == 'combination-dependent':
+            if not isinstance(n_entities, int):
+                raise ValueError(VALIDATION_ERR_MSG['cb'])
+            elif not isinstance(n_features, int):
+                raise ValueError(VALIDATION_ERR_MSG['cb'])
+        # [END combination-dependent param validation]
         self.k = k
         self.mode = mode
         self.n_epochs = n_epochs
