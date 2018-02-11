@@ -45,6 +45,8 @@ class FMLite:
         # [END combination-dependent param validation]
         self.k = k
         self.mode = mode
+        self.n_entities = n_entities
+        self.n_features = n_features
         self.n_epochs = n_epochs
         self.verbose = verbose
         self.learning_rate = 0.001  # TODO 学習率が大きいと残渣が得られない

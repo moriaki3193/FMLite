@@ -7,6 +7,9 @@ class TestFMLiteInitialization(unittest.TestCase):
 
     def test_initialization(self):
         self.assertRaises(ValueError, lambda: FMLite(mode='foo'))
+        self.assertRaises(
+            ValueError,
+            lambda: FMLite(mode='combination-dependent'))
 
 
 if __name__ == '__main__':
