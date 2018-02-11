@@ -2,6 +2,7 @@
 import numpy as np
 from tqdm import tqdm
 from itertools import combinations
+from prettytable import PrettyTable
 
 
 class FMLite:
@@ -11,6 +12,7 @@ class FMLite:
     def __init__(
             self,
             k=10,
+            n_epochs=1000,
             task='regression',
             mode='normal',
             biased=True,
@@ -31,6 +33,7 @@ class FMLite:
         """
         self.k = k
         self.mode = mode
+        self.n_epochs = n_epochs
         self.verbose = verbose
         self.learning_rate = 0.001  # TODO 学習率が大きいと残渣が得られない
         self.b = None  # set when self.fit is called
@@ -91,14 +94,13 @@ class FMLite:
         # [END MLSに対する偏微分の値を返す関数の定義]
 
         errors = []
-        n_epochs = 100  # エポック数
         n_samples, n_features = X_train.shape
         normal_params = {'scale': 0.01, 'size': (n_features, self.k)}
         self.b = 0.0
         self.w = np.zeros(n_features)
         self.V = np.asmatrix(np.random.normal(**normal_params))
         # [START parameter estimation]
-        for _ in tqdm(range(n_epochs)):
+        for _ in tqdm(range(self.n_epochs)):
             for ind in np.random.permutation(n_samples):
                 x = np.asarray(X_train[ind]).ravel()
                 y = y_train[ind]
@@ -116,6 +118,15 @@ class FMLite:
 
     def fit(self, X_train, y_train):
         """Fitting using SGD methods.
+
+        params
+        ------
+        X_train : np.matrix, shape = (n_samples, n_features)
+        y_train : np.array or list, shape = (n_samples, )
+
+        return
+        ------
+        self : an fitted instance of FMLite
         """
         if isinstance(y_train, list):
             y_train = np.asarray(y_train)
@@ -125,8 +136,14 @@ class FMLite:
             raise ValueError('n_samples of X and y must be equal.')
         self.errors = self._gradient_descent(X_train, y_train)  # fitting
         if self.verbose:
-            # squared_errors を利用した学習過程の表示
-            print(self)
+            table = PrettyTable(['FIELD', 'VALUE'])
+            table.align['FIELD'] = 'l'
+            table.add_row(['epochs', self.n_epochs])
+            table.add_row(['RMSE', round(((self.errors ** 2) ** 0.5).mean())])
+            table.add_row(['bias', round(self.b, 4)])
+            for idx, w_i in enumerate(self.w):
+                table.add_row(['feat {}'.format(idx+1), round(w_i, 4)])
+            print(table)
         return self
 
     def predict(self, X):

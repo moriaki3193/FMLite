@@ -21,9 +21,9 @@ class TestFMLiteFitting(unittest.TestCase):
         self.target = [5, 3, 1, 4, 5, 1, 5]
 
     def test_does_model_fit(self):
-        fm = FMLite()
+        fm = FMLite(n_epochs=10)
         model = fm.fit(self.features[:6, ], self.target[:6])
-        self.assertEqual(len(model.errors), 6 * 100)
+        self.assertEqual(len(model.errors), 6 * model.n_epochs)
 
 
 if __name__ == '__main__':

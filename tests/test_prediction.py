@@ -7,7 +7,7 @@ from fmlite.core import FMLite
 class TestFMLitePrediction(unittest.TestCase):
 
     def setUp(self):
-        fm = FMLite()
+        fm = FMLite(n_epochs=10)
         self.features = np.matrix([
            #  Users  |     Movies     |    Movie Ratings   | Time | Last Movies Rated
            # A  B  C | TI  NH  SW  ST | TI   NH   SW   ST  |      | TI  NH  SW  ST
