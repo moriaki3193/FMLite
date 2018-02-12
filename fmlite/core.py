@@ -13,6 +13,7 @@ class FMLite:
     def __init__(
             self,
             k=10,
+            C=10,
             n_epochs=1000,
             task='regression',
             mode='normal',
@@ -26,6 +27,8 @@ class FMLite:
         ------
         k : int, hyper-parameter of FM.
             Defines the number of columns of V.
+        C : int, hyper-parameter of combination-dependent FM.
+            Default to 10.
         mode : str, a mode of FM
             Possible values are either `normal` of `combination-dependent`.
             Default to `normal`.
@@ -48,6 +51,7 @@ class FMLite:
         self.n_entities = n_entities
         self.n_features = n_features
         self.n_epochs = n_epochs
+        self.C = C
         self.verbose = verbose
         self.learning_rate = 0.001  # TODO 学習率が大きいと残渣が得られない
         self.b = None  # set when self.fit is called
@@ -69,7 +73,7 @@ class FMLite:
         return self.b + np.dot(self.w, x.T) + interaction_sum
 
     def _partial_normal_V(self, x):
-        """Vの(i, f)成分でy_predを偏微分した値を返すメソッド
+        """Vの(i, f)成分でJ(D)を偏微分した値を返すメソッド
         """
         n_features = x.shape[0]
         _V = np.empty((n_features, self.k))
@@ -81,26 +85,24 @@ class FMLite:
                 _V[i, f] = x[i] * s - self.V[i, f] * x[i] ** 2
         return np.asmatrix(_V)
 
-    def _partial_cb_V(self, x):
-        """Vの(i, f)成分でy_predを偏微分した値を返すメソッド
-
-        0 <= i < n_entities && n_entities <= j < 2 * n_entities
-        を満たす idx, jdx の組合せのみについてVの勾配を計算する.
+    def _partial_cb_V(self, diff, x):
+        """Vの(i, f)成分でJ(D)を偏微分した値を返すメソッド
         """
         M = self.n_entities
         n = self.n_features
         _V = np.empty((2 * M + n, self.k))
+        # [TODO リファクタリング]
         for i in range(2 * M + n):
             for f in range(self.k):
                 s = 0.0
+                t = 0.0
                 for j in range(2 * M + n):
+                    s += self.V[j, f] * x[j]
                     if 0 <= i < M and 0 <= j < M:
-                        continue
+                        t += np.dot(self.V[i], self.V[j].T) * self.V[i, f]
                     elif M <= i < 2 * M and M <= j < 2 * M:
-                        continue
-                    else:
-                        s += self.V[j, f] * x[j]
-                _V[i, f] = x[i] * s - self.V[i, f] * x[i] ** 2
+                        t += np.dot(self.V[i], self.V[j].T) * self.V[i, f]
+                _V[i, f] = diff * (x[i] * s - self.V[i, f] * x[i] ** 2) + self.C * t
         return np.asmatrix(_V)
 
     def _make_evaluate_grad_func(self):
@@ -118,9 +120,9 @@ class FMLite:
         elif self.mode == 'combination-dependent':
             # [START combination-dependent version]
             def _calc_cb(x_i, diff):
-                b_grad = 2 * diff
-                w_grad = 2 * diff * x_i
-                V_grad = 2 * diff * self._partial_cb_V(x_i)
+                b_grad = diff
+                w_grad = diff * x_i
+                V_grad = self._partial_cb_V(diff, x_i)
                 return (b_grad, w_grad, V_grad)
             return _calc_cb
             # [END combination-dependent version]
